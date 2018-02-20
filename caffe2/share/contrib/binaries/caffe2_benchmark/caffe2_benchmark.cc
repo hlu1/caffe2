@@ -13,9 +13,9 @@
 
 CAFFE2_DEFINE_string(
     backend,
-    "default",
+    "builtin",
     "The backend to use when running the model. The allowed "
-    "backend choices are: default, nnpack");
+    "backend choices are: builtin, default, nnpack, eigen, mkl");
 CAFFE2_DEFINE_string(
     init_net,
     "",
@@ -147,6 +147,9 @@ int main(int argc, char** argv) {
         for (const string& s : input_dims_str) {
           input_dims.push_back(caffe2::stoi(s));
         }
+        if (!workspace->HasBlob(input_names[i])) {
+          workspace->CreateBlob(input_names[i]);
+        }
         caffe2::TensorCPU* tensor =
             workspace->GetBlob(input_names[i])->GetMutable<caffe2::TensorCPU>();
         tensor->Resize(input_dims);
@@ -169,14 +172,16 @@ int main(int argc, char** argv) {
   // Run main network.
   caffe2::NetDef net_def;
   CAFFE_ENFORCE(ReadProtoFromFile(caffe2::FLAGS_net, &net_def));
-  if (caffe2::FLAGS_backend == "nnpack") {
+  if (caffe2::FLAGS_backend != "builtin") {
+    std::string engine = caffe2::FLAGS_backend == "nnpack" ? "NNPACK" :
+                         caffe2::FLAGS_backend == "eigen" ? "EIGEN" :
+                         caffe2::FLAGS_backend == "mkl" ? "MKLDNN" :
+                         caffe2::FLAGS_backend == "default" ? "" : "NONE";
+     CAFFE_ENFORCE(engine != "NONE", "Backend is not supported");
     for (int i = 0; i < net_def.op_size(); i++) {
       caffe2::OperatorDef* op_def = net_def.mutable_op(i);
-      op_def->set_engine("NNPACK");
+      op_def->set_engine(engine);
     }
-  } else {
-    CAFFE_ENFORCE(
-        caffe2::FLAGS_backend == "default", "Backend is not supported");
   }
 
   caffe2::NetBase* net = workspace->CreateNet(net_def);

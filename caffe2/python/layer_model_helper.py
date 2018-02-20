@@ -213,8 +213,9 @@ class LayerModelHelper(model_helper.ModelHelper):
         if shape != ref_shape:
             raise ValueError(
                 "Got inconsistent shapes between shared parameters "
-                "when trying to map a blob in scope {0} to {1}.".format(
-                    scope.CurrentNameScope(), param_name)
+                "when trying to map a blob in scope {0} to {1}. ref_shape : "
+                " {2}, shape : {3}".format(
+                    scope.CurrentNameScope(), param_name, ref_shape, shape)
             )
 
     def create_param(self, param_name, shape, initializer, optimizer=None,
@@ -374,6 +375,9 @@ class LayerModelHelper(model_helper.ModelHelper):
         assert self._loss is None
         self._loss = loss
 
+    def has_loss(self):
+        return self._loss is not None
+
     def add_loss(self, loss, name='unnamed'):
         assert loss is not None, "Added loss should not be None"
         assert isinstance(loss, schema.Scalar) or isinstance(
@@ -390,6 +394,10 @@ class LayerModelHelper(model_helper.ModelHelper):
                 index += 1
             loss_struct = schema.Struct((prefix, loss))
             self._loss = self._loss + loss_struct
+
+    def add_trainer_extra_schema(self, trainer_extra_schema):
+        trainer_extra_record = schema.NewRecord(self.net, trainer_extra_schema)
+        self._trainer_extra_schema += trainer_extra_record
 
     def __getattr__(self, layer):
         if layer.startswith('__'):
